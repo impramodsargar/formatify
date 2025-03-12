@@ -1,6 +1,6 @@
 <svg width="300" height="120" xmlns="http://www.w3.org/2000/svg">
-  <rect width="100%" height="100%" fill="#FFFFFF"/>
-
+  <!-- No Background -->
+  
   <!-- FORMATIFY Text (Letter-by-Letter Animation) -->
   <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="36" fill="#4A90E2" text-anchor="middle" alignment-baseline="middle">
     <tspan opacity="0">
@@ -41,7 +41,7 @@
     </tspan>
   </text>
 
-  <!-- Subtag: Made with ❤️ by Sid (Appears After the Main Text) -->
+  <!-- Subtag: Made with ❤️ by Sid -->
   <text x="50%" y="70%" font-family="Arial, sans-serif" font-size="14" fill="#1A3A6F" text-anchor="middle" alignment-baseline="middle" opacity="0">
     Made with ❤️ by Sid
     <animate attributeName="opacity" from="0" to="1" begin="1s" dur="1s" fill="freeze"/>
