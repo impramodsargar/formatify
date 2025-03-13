@@ -115,7 +115,7 @@ searchFor=formatify&goButton=go
 
 ### **🔗 Clone the Repository**  
 ```sh
-git clone https://github.com/yourusername/formatify.git
+git clone https://github.com/dr34mhacks/formatify.git
 cd formatify
 ```
 
