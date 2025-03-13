@@ -144,7 +144,7 @@ cd formatify
 
 ### 🔔 **Stay Updated**  
 
-📢 **Connect with me on LinkdIn** [LinkedIn](https://www.linkedin.com/in/sid-j0shi/)  
+📢 **Connect with me on** [LinkedIn](https://www.linkedin.com/in/sid-j0shi/)  
 
 ---
 
