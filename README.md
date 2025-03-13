@@ -40,7 +40,7 @@ No more installing multiple extensions like:
 ## 📥 **Installation**  
 
 ### **Prerequisites**  
-- **Burp Suite** (Pro)  
+- **Burp Suite** (Pro or Community Edition)  
 - **Jython** environment setup  
 
 ### **Installing Formatify**  
