@@ -59,10 +59,10 @@ No more installing multiple extensions like:
 ### **🔹 Using the Context Menu**  
 
 1️⃣ In **Burp Suite's Repeater or Intruder**, right-click on a request  
-2️⃣ Select **"Send to Request Converter"** from the context menu  
-3️⃣ The request will appear in the **Request Converter** tab  
+2️⃣ Select **"Send to Formatify"** from the context menu  
+3️⃣ The request will appear in the **Formatify** tab  
 4️⃣ Choose a format from the dropdown  
-5️⃣ Click **Convert** to generate the converted request  
+5️⃣ Click **Formatify** to generate the converted request  
 
 ---
 
