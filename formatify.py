@@ -4,7 +4,7 @@
 """
 Formatify - Burp Suite Extension for HTTP request formating 
 Author: Sid Joshi 
-Version: 1.2
+Version: 1.3
 
 This extension allows you to convert HTTP requests from Burp Suite into various formats
 including JavaScript Fetch, cURL, Python Requests, Go, PowerShell, and more.
@@ -325,9 +325,11 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory, IExtensionStateList
             file_path = selected_file.getAbsolutePath()
 
             try:
-
-                with BufferedWriter(FileWriter(file_path)) as writer:
+                writer = BufferedWriter(FileWriter(file_path))
+                try:
                     writer.write(output_text)
+                finally:
+                    writer.close()
 
                 JOptionPane.showMessageDialog(self._panel,
                                              "Content saved to file successfully!\nLocation: " + file_path,
@@ -378,7 +380,24 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory, IExtensionStateList
                     headers[key] = value
 
             host = headers.get("Host", "")
-            url = "https://" + host + path
+            
+            # Detect protocol from headers
+            protocol = "https"
+            
+            # Check for HTTP indicators in headers
+            origin = headers.get("Origin", "")
+            referer = headers.get("Referer", "")
+            
+            if origin.startswith("http://") or referer.startswith("http://"):
+                protocol = "http"
+            
+            # Check for explicit HTTP indicators in other headers
+            if "upgrade-insecure-requests" not in [h.lower() for h in headers.keys()]:
+                # If no upgrade-insecure-requests header, more likely to be HTTP
+                if origin.startswith("http://") or referer.startswith("http://"):
+                    protocol = "http"
+            
+            url = protocol + "://" + host + path
 
             if conversion_type == "JavaScript Fetch":
                 result = self._to_javascript_fetch(method, url, headers, body)
@@ -426,11 +445,11 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory, IExtensionStateList
         """
         Convert to JavaScript Fetch API
         """
-        headers_str = ",\n    ".join(['"' + k + '": "' + v + '"' for k, v in headers.items()])
+        headers_str = ",\n    ".join(['"' + k + '": "' + v.replace('"', '\\"') + '"' for k, v in headers.items()])
 
         content_type = headers.get("Content-Type", "")
         if "json" in content_type.lower() and body.strip():
-            body_str = body
+            body_str = json.dumps(body)
         else:
             body_str = json.dumps(body) if body else "null"
 
@@ -461,40 +480,38 @@ fetch("%s", {
         """
         Convert to cURL command
         """
-        headers_str = " \\\n  ".join(['-H "' + k + ': ' + v + '"' for k, v in headers.items()])
+        # Build headers with proper escaping and ensure no truncation
+        header_lines = []
+        for k, v in headers.items():
+            # Skip headers that cURL handles automatically
+            if k.lower() in ['accept-encoding', 'content-length', 'host']:
+                continue
+            # Escape quotes and ensure full header value is preserved
+            escaped_value = str(v).replace('"', '\\"')
+            header_lines.append('-H "' + k + ': ' + escaped_value + '"')
+        
+        headers_str = " \\\n  ".join(header_lines)
 
-        content_type = headers.get("Content-Type", "")
+        # Handle request body
+        data_str = ""
         if body and body.strip():
-            body_content = body.strip()
+            body_content = body.strip().replace("'", "'\"'\"'")  # Escape single quotes for shell
+            data_str = " \\\n  --data-raw '%s'" % body_content
 
-            if body_content.startswith('@'):
-
-                body_str = '--data-raw \'' + body_content + '\' \\'
-            elif "json" in content_type.lower():
-
-                body_str = '--data-raw \'' + body_content + '\' \\'
-            elif "form" in content_type.lower():
-
-                body_str = '--data-raw \'' + body_content + '\' \\'
-            else:
-
-                body_str = '--data-raw \'' + body_content + '\' \\'
-        else:
-            body_str = ""
-
-        curl_cmd = """# cURL Command
-curl -X %s \\
-  %s \\
-  %s
+        # Build the complete cURL command with proper response handling
+        curl_cmd = """curl -L --max-time 30 --connect-timeout 10 \\
+  -X %s \\
+  %s%s \\
   "%s"
-""" % (method, headers_str, body_str, url)
+""" % (method, headers_str, data_str, url)
+
         return curl_cmd
 
     def _to_python_requests(self, method, url, headers, body):
         """
         Convert to Python Requests
         """
-        headers_str = ",\n    ".join(['"' + k + '": "' + v + '"' for k, v in headers.items()])
+        headers_str = ",\n    ".join(['"' + k + '": "' + v.replace('"', '\\"') + '"' for k, v in headers.items()])
 
         content_type = headers.get("Content-Type", "")
         if body and body.strip():
@@ -536,7 +553,7 @@ print(response.text)
         """
         Convert to Python aiohttp
         """
-        headers_str = ",\n        ".join(['"' + k + '": "' + v + '"' for k, v in headers.items()])
+        headers_str = ",\n        ".join(['"' + k + '": "' + v.replace('"', '\\"') + '"' for k, v in headers.items()])
 
         content_type = headers.get("Content-Type", "")
         if body and body.strip():
@@ -578,7 +595,7 @@ asyncio.run(main())
         """
         Convert to Node.js Axios
         """
-        headers_str = ",\n    ".join(['"' + k + '": "' + v + '"' for k, v in headers.items()])
+        headers_str = ",\n    ".join(['"' + k + '": "' + v.replace('"', '\\"') + '"' for k, v in headers.items()])
 
         content_type = headers.get("Content-Type", "")
         if body and body.strip():
@@ -622,7 +639,7 @@ axios(config)
         """
         Convert to Go http package
         """
-        headers_str = "\n\t".join(['req.Header.Add("' + k + '", "' + v + '")' for k, v in headers.items()])
+        headers_str = "\n\t".join(['req.Header.Add("' + k + '", "' + v.replace('"', '\\"') + '")' for k, v in headers.items()])
 
         if body and body.strip():
             body_str = """
@@ -685,16 +702,15 @@ func main() {%s
         """
         Convert to PowerShell
         """
-        headers_str = "\n".join(['$headers.Add("' + k + '", "' + v + '")' for k, v in headers.items()])
+        headers_str = "\n".join(['$headers.Add("' + k + '", "' + v.replace('"', '\\"') + '")' for k, v in headers.items()])
 
         if body and body.strip():
-            body_str = '$body = @"\n' + body.strip() + '\n"@\n'
+            escaped_body = body.strip().replace('"', '`"')
+            body_str = '$body = @"\n' + escaped_body + '\n"@\n'
         else:
             body_str = ""
 
-        powershell_code = """# PowerShell Web Request
-
-$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+        powershell_code = """$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 %s
 
 %s
@@ -711,43 +727,56 @@ Write-Host $response.Content
         """
         Convert to FFUF command for fuzzing
         """
-
-        fuzz_url = url.replace("=", "=FUZZ", 1) if "=" in url else url + "/FUZZ"
-
-        headers_str = " \\\n  ".join(['-H "' + k + ': ' + v + '"' for k, v in headers.items()])
-
-        if body and body.strip():
-            body_content = body.strip().replace("=", "=FUZZ", 1)
-
-            if body_content.startswith('@'):
-                body_str = '--data-raw \'' + body_content + '\' \\'
-            else:
-                body_str = '--data-raw \'' + body_content + '\' \\'
+        # Create fuzz URL - add FUZZ parameter intelligently
+        if "?" in url:
+            fuzz_url = url + "&FUZZ=1"  # Add as additional parameter
         else:
-            body_str = ""
+            fuzz_url = url + "?FUZZ=1"  # Add as first parameter
+        
+        # Skip problematic headers like cURL
+        header_lines = []
+        for k, v in headers.items():
+            if k.lower() in ['accept-encoding', 'content-length', 'host']:
+                continue
+            escaped_value = str(v).replace('"', '\\"')
+            header_lines.append('-H "' + k + ': ' + escaped_value + '"')
+        
+        headers_str = " \\\n  ".join(header_lines)
 
-        ffuf_cmd = """# FFUF Command for fuzzing
-ffuf -w wordlist.txt \\
+        # Handle request body with fuzzing
+        data_str = ""
+        if body and body.strip():
+            # Add FUZZ to body for parameter fuzzing
+            if "=" in body:
+                body_content = body.strip() + "&FUZZ=1"
+            else:
+                body_content = body.strip()
+            body_content = body_content.replace("'", "'\"'\"'")
+            data_str = " \\\n  --data '%s'" % body_content
+
+        # Build FFUF command with common options
+        ffuf_cmd = """ffuf -w /path/to/wordlist.txt \\
   -u "%s" \\
   -X %s \\
-  %s
-  %s
+  %s%s \\
+  -c \\
   -v
-
-""" % (fuzz_url, method, headers_str, body_str)
+""" % (fuzz_url, method, headers_str, data_str)
+        
         return ffuf_cmd
 
     def _to_java_okhttp(self, method, url, headers, body):
         """
         Convert to Java OkHttp
         """
-        headers_str = "\n        ".join(['.addHeader("' + k + '", "' + v + '")' for k, v in headers.items()])
+        headers_str = "\n        ".join(['.addHeader("' + k + '", "' + v.replace('"', '\\"') + '")' for k, v in headers.items()])
 
         content_type = headers.get("Content-Type", "text/plain")
 
         if body and body.strip():
+            escaped_body = body.replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
             body_code = """        MediaType mediaType = MediaType.parse("%s");
-        RequestBody body = RequestBody.create(mediaType, "%s");""" % (content_type, body.replace('"', '\\"'))
+        RequestBody body = RequestBody.create(mediaType, "%s");""" % (content_type, escaped_body)
         else:
             body_code = "        RequestBody body = null;"
 
@@ -780,38 +809,51 @@ public class HttpRequest {
         """
         Create a CSRF payload
         """
-
         form_fields = ""
         content_type = headers.get("Content-Type", "")
 
         if body and body.strip():
             if "application/x-www-form-urlencoded" in content_type:
-
+                # Parse URL-encoded form data
                 try:
                     params = body.split("&")
                     for param in params:
                         if "=" in param:
                             name, value = param.split("=", 1)
-                            form_fields += '    <input type="hidden" name="' + name + '" value="' + value + '">\n'
+                            # HTML escape the values to prevent XSS
+                            escaped_name = name.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+                            escaped_value = value.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+                            form_fields += '    <input type="hidden" name="' + escaped_name + '" value="' + escaped_value + '">\n'
                 except:
-                    form_fields = '    <input type="hidden" name="data" value="' + body + '">\n'
+                    escaped_body = body.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+                    form_fields = '    <input type="hidden" name="data" value="' + escaped_body + '">\n'
             elif "application/json" in content_type:
-
-                form_fields = '    <input type="hidden" name="json_data" value=\'' + body + '\'>\n'
+                # For JSON, we need to send via JavaScript since forms can't send JSON directly
+                escaped_json = body.replace("'", "\\'").replace('"', '\\"')
+                form_fields = '    <!-- JSON payload will be sent via JavaScript -->\n'
+                form_fields += '    <script>var jsonData = \'' + escaped_json + '\';</script>\n'
             else:
+                # Other content types - escape HTML
+                escaped_body = body.replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+                form_fields = '    <input type="hidden" name="data" value="' + escaped_body + '">\n'
 
-                form_fields = '    <input type="hidden" name="data" value="' + body + '">\n'
-
-        csrf_html = """<!-- CSRF Payload -->
+        csrf_html = """<!-- CSRF Payload by Formatify-->
 <html>
 <head>
     <title>CSRF Exploit</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; text-align: center; }
-        h1 { color: 
-        form { margin: 20px auto; padding: 20px; max-width: 500px; }
-        input[type="submit"] { background-color: 
-                              padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+        h1 { color: #d9534f; }
+        form { margin: 20px auto; padding: 20px; max-width: 500px; border: 1px solid #ccc; }
+        input[type="submit"] { 
+            background-color: #d9534f; 
+            color: white;
+            padding: 10px 20px; 
+            border: none;
+            border-radius: 5px; 
+            cursor: pointer; 
+        }
+        input[type="submit"]:hover { background-color: #c9302c; }
     </style>
 </head>
 <body>
@@ -820,7 +862,7 @@ public class HttpRequest {
 
     <form action="%s" method="%s" id="csrf-form">
 %s
-        <input type="submit" value="Submit request">
+        <input type="submit" value="Submit Request">
     </form>
 
     <script>
@@ -838,18 +880,53 @@ public class HttpRequest {
         """
         Create a CORS exploit proof of concept
         """
+        # Build headers for the request
+        request_headers = {}
+        for k, v in headers.items():
+            if k.lower() not in ['host', 'origin', 'referer']:
+                request_headers[k] = v
+        
+        # Prepare headers for JavaScript
+        headers_js = ""
+        if request_headers:
+            headers_js = ",\n                ".join(['"' + k + '": "' + v.replace('"', '\\"') + '"' for k, v in request_headers.items()])
+            headers_js = ',\n                headers: {\n                    ' + headers_js + '\n                }'
+        
+        # Prepare body for JavaScript
+        body_js = ""
+        if body and body.strip():
+            escaped_body = body.replace('"', '\\"').replace('\n', '\\n')
+            body_js = ',\n                body: "' + escaped_body + '"'
 
-        cors_html = """<!-- CORS Vulnerability Proof of Concept -->
+        cors_html = """<!-- CORS Vulnerability Proof of Concept by Formatify-->
 <html>
 <head>
     <title>CORS Vulnerability PoC</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
-        h1 { color: 
-        pre { background-color: 
-
-        button { background-color: 
-        button:hover { background-color: 
+        h1 { color: #f0ad4e; }
+        pre { 
+            background-color: #f5f5f5; 
+            padding: 10px; 
+            border-radius: 5px; 
+            overflow-x: auto; 
+        }
+        button { 
+            background-color: #f0ad4e; 
+            color: white;
+            border: none;
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 16px;
+        }
+        button:hover { background-color: #ec971f; }
+        #output { 
+            margin-top: 20px; 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+        }
     </style>
 </head>
 <body>
@@ -865,11 +942,11 @@ public class HttpRequest {
             const outputDiv = document.getElementById('output');
             outputDiv.innerHTML = "Testing CORS vulnerability...";
 
-            // Make the cross-origin request
+            // Make the cross-origin request with actual headers and body
             fetch("%s", {
                 method: "%s",
                 credentials: "include",  // Send cookies if available
-                mode: "cors"
+                mode: "cors"%s%s
             })
             .then(response => {
                 outputDiv.innerHTML += "<br>Response received! Status: " + response.status;
@@ -881,7 +958,7 @@ public class HttpRequest {
                     "<h3>CORS Vulnerability Confirmed!</h3>" +
                     "<p>The application responded to the cross-origin request and shared sensitive data.</p>" +
                     "<h4>Response Data:</h4>" +
-                    "<pre>" + escapeHtml(data) + "</pre>";
+                    "<pre>" + escapeHtml(data.substring(0, 1000)) + (data.length > 1000 ? "..." : "") + "</pre>";
             })
             .catch(error => {
                 outputDiv.innerHTML = 
@@ -906,7 +983,7 @@ public class HttpRequest {
     </script>
 </body>
 </html>
-""" % (url, url, method)
+""" % (url, url, method, headers_js, body_js)
         return cors_html
 
         # Made with Love by Sid Joshi
