@@ -4,7 +4,7 @@
 """
 Formatify - Burp Suite Extension for HTTP request formating 
 Author: Sid Joshi 
-Version: 1.3
+Version: 1.4
 
 This extension allows you to convert HTTP requests from Burp Suite into various formats
 including JavaScript Fetch, cURL, Python Requests, Go, PowerShell, and more.
@@ -267,6 +267,13 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory, IExtensionStateList
         request = http_message.getRequest()
         request_str = self._helpers.bytesToString(request)
         self._requestTextArea.setText(request_str)
+        
+        # Store the protocol and host from the HTTP service
+        http_service = http_message.getHttpService()
+        self._current_protocol = http_service.getProtocol()
+        self._current_host = http_service.getHost()
+        self._current_port = http_service.getPort()
+        
         parent_frame = SwingUtilities.getWindowAncestor(self._panel)
         if parent_frame is None:
             parent_frame = self._panel
@@ -279,6 +286,13 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory, IExtensionStateList
     def clearFields(self):
         self._requestTextArea.setText("")
         self._outputTextArea.setText("")
+        # Clear stored protocol info
+        if hasattr(self, '_current_protocol'):
+            delattr(self, '_current_protocol')
+        if hasattr(self, '_current_host'):
+            delattr(self, '_current_host')
+        if hasattr(self, '_current_port'):
+            delattr(self, '_current_port')
 
     def copyToClipboard(self):
         """
@@ -379,21 +393,21 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory, IExtensionStateList
                     key, value = line.split(": ", 1)
                     headers[key] = value
 
-            host = headers.get("Host", "")
-            
-            # Detect protocol from headers
-            protocol = "https"
-            
-            # Check for HTTP indicators in headers
-            origin = headers.get("Origin", "")
-            referer = headers.get("Referer", "")
-            
-            if origin.startswith("http://") or referer.startswith("http://"):
-                protocol = "http"
-            
-            # Check for explicit HTTP indicators in other headers
-            if "upgrade-insecure-requests" not in [h.lower() for h in headers.keys()]:
-                # If no upgrade-insecure-requests header, more likely to be HTTP
+            # Use stored protocol and host info if available (from context menu), 
+            # otherwise fall back to header-based detection
+            if hasattr(self, '_current_protocol') and hasattr(self, '_current_host'):
+                protocol = self._current_protocol
+                host = self._current_host
+                # Handle non-standard ports
+                if ((protocol == "http" and self._current_port != 80) or 
+                    (protocol == "https" and self._current_port != 443)):
+                    host = host + ":" + str(self._current_port)
+            else:
+                # Fallback for manual input - detect from headers
+                host = headers.get("Host", "")
+                protocol = "https"
+                origin = headers.get("Origin", "")
+                referer = headers.get("Referer", "")
                 if origin.startswith("http://") or referer.startswith("http://"):
                     protocol = "http"
             
