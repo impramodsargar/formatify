@@ -95,7 +95,6 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory, IExtensionStateList
     def _buildUI(self):
 
         self._panel = JPanel(BorderLayout())
-        self._panel.setBackground(Color(240, 240, 240))
 
         logoPanel = JPanel(BorderLayout())
         logoPanel.setBackground(Color(70, 130, 180))
@@ -124,7 +123,6 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory, IExtensionStateList
 
         topPanel = JPanel(BorderLayout())
         topPanel.setBorder(BorderFactory.createTitledBorder("Formatify - Request Input"))
-        topPanel.setBackground(Color(240, 240, 240))
 
         self._requestTextArea = JTextArea(10, 100)
         self._requestTextArea.setFont(Font("Monospaced", Font.PLAIN, 13))
@@ -134,16 +132,13 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory, IExtensionStateList
         controlPanel = JPanel()
         controlPanel.setLayout(BoxLayout(controlPanel, BoxLayout.Y_AXIS))
         controlPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10))
-        controlPanel.setBackground(Color(240, 240, 240))
 
         optionsLabelPanel = JPanel(FlowLayout(FlowLayout.CENTER))
-        optionsLabelPanel.setBackground(Color(240, 240, 240))
         optionsLabel = JLabel("Formatify to:")
         optionsLabel.setFont(Font("SansSerif", Font.BOLD, 14))
         optionsLabelPanel.add(optionsLabel)
 
         dropdownPanel = JPanel(FlowLayout(FlowLayout.CENTER))
-        dropdownPanel.setBackground(Color(240, 240, 240))
         self._conversionOptions = JComboBox([
             "JavaScript Fetch",
             "cURL Command",
@@ -162,13 +157,10 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory, IExtensionStateList
         dropdownPanel.add(self._conversionOptions)
 
         buttonsPanel = JPanel(FlowLayout(FlowLayout.CENTER))
-        buttonsPanel.setBackground(Color(240, 240, 240))
 
         convertButton = JButton("Formatify!")
         convertButton.setFont(Font("SansSerif", Font.BOLD, 13))
         convertButton.setPreferredSize(Dimension(120, 35))
-        convertButton.setBackground(Color(70, 130, 180))
-        convertButton.setForeground(Color.WHITE)
         convertButton.addActionListener(ConvertButtonListener(self))
 
         clearButton = JButton("Clear")
@@ -187,7 +179,6 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory, IExtensionStateList
 
         bottomPanel = JPanel(BorderLayout())
         bottomPanel.setBorder(BorderFactory.createTitledBorder("Formatify - Converted Output"))
-        bottomPanel.setBackground(Color(240, 240, 240))
 
         self._outputTextArea = JTextArea(10, 100)
         self._outputTextArea.setFont(Font("Monospaced", Font.PLAIN, 13))
@@ -196,7 +187,6 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory, IExtensionStateList
         outputScrollPane = JScrollPane(self._outputTextArea)
 
         outputButtonsPanel = JPanel(FlowLayout(FlowLayout.LEFT))
-        outputButtonsPanel.setBackground(Color(240, 240, 240))
 
         copyButton = JButton("Copy to Clipboard")
         copyButton.setFont(Font("SansSerif", Font.PLAIN, 12))
@@ -212,14 +202,12 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory, IExtensionStateList
         outputButtonsPanel.add(saveButton)
 
         footerPanel = JPanel(FlowLayout(FlowLayout.RIGHT))
-        footerPanel.setBackground(Color(240, 240, 240))
         tagline = JLabel("Created with <3 by Sid")
         tagline.setFont(Font("SansSerif", Font.ITALIC, 12))
         tagline.setForeground(Color(100, 100, 100))
         footerPanel.add(tagline)
 
         bottomControlPanel = JPanel(BorderLayout())
-        bottomControlPanel.setBackground(Color(240, 240, 240))
         bottomControlPanel.add(outputButtonsPanel, BorderLayout.WEST)
         bottomControlPanel.add(footerPanel, BorderLayout.EAST)
 
