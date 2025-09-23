@@ -78,7 +78,7 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory, IExtensionStateList
 
         self._threads = []
 
-        print("Formatify v1.2 loaded successfully")
+        print("Formatify v1.4 loaded successfully")
         print("Created by Sid Joshi")
         print("Right-click on a request in Repeater or Intruder and select 'Send to Formatify'")
 
